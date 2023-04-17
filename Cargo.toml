@@ -1,0 +1,13 @@
+[package]
+name = "wireguard-web-autopeer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+default-net = "0.14.1"
+if-watch = "3.0.1"
+reqwest = { version = "0.11.16", features = ["blocking", "json"] }
+tray-item = "0.7.1"
+wireguard-control = "1.5.0"
