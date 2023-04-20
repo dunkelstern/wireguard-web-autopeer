@@ -53,8 +53,8 @@ pub fn peering_request(interface: &Interface, db: &Vec<IfDatabase>) -> PeeringRe
 
         for ip in ips {
             let client = reqwest::blocking::Client::new();
-            // let url = format!("https://{}", ip);
-            let url = format!("http://localhost:8000?{}", ip);
+            let url = format!("https://{}", ip);
+            //let url = format!("http://localhost:8000?{}", ip);
             let res = client.post(url)
                 .json(&json_data)
                 .send();
