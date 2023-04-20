@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+
 use http::peering_request;
 use monitor::monitor;
 use network_interface::wireguard_interfaces;

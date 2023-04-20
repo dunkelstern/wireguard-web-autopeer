@@ -26,7 +26,7 @@ pub struct PeeringResponse {
 
 pub fn peering_request(interface: &Interface, db: &Vec<IfDatabase>) -> PeeringResponse {
     let mut json_data: Vec<PeeringRequest> = vec![];
-    
+
     for item in db {
         json_data.push(PeeringRequest{
             ip: item.net.addr(),
@@ -34,7 +34,7 @@ pub fn peering_request(interface: &Interface, db: &Vec<IfDatabase>) -> PeeringRe
             gateway: item.gateway
         });
     }
-    
+
     let mut ips: Vec<IpAddr> = vec![];
     for v4 in interface.ipv4.iter() {
         ips.push(v4.first_ip());
@@ -42,14 +42,14 @@ pub fn peering_request(interface: &Interface, db: &Vec<IfDatabase>) -> PeeringRe
     for v6 in interface.ipv6.iter() {
         ips.push(v6.first_ip());
     }
-    
+
     ips.sort();
     ips.dedup();
-    
+
     let mut peers: Vec<Peer> = vec![];
-    
+
     if let Ok(data) = serde_json::to_string(&json_data) {
-        println!("Sending to {:?} JSON: {}", ips, data);
+        debug!("Sending to {:?} JSON: {}", ips, data);
 
         for ip in ips {
             let client = reqwest::blocking::Client::new();
@@ -68,15 +68,14 @@ pub fn peering_request(interface: &Interface, db: &Vec<IfDatabase>) -> PeeringRe
                         }
                     }
                     Err(error) => {
-                        println!("Error decoding JSON: {:?}", error);
+                        error!("Error decoding JSON: {:?}", error);
                     }
                 }
             } else if let Err(response) = res {
-                println!("ERROR: {:?}", response)
+                error!("ERROR: {:?}", response)
             }
         }
     }
-    
+
     PeeringResponse { peers }
 }
-

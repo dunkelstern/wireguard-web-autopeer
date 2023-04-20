@@ -16,17 +16,17 @@ pub fn if_up(net: IpNet, interfaces: Vec<Interface>, db: &Vec<IfDatabase>) -> Ch
     // - if there is one, add this interface to our watchlist
     let mut changed = false;
     let mut result = db.clone();
-    
+
     for interface in interfaces {
         if let Some(gateway) = interface.gateway {
             if net.contains(&gateway.ip_addr) {
-                println!("Net up: {:?}, Gateway IP: {}", net, gateway.ip_addr);
+                info!("Net up: {:?}, Gateway IP: {}", net, gateway.ip_addr);
                 changed = true;
                 result.push(IfDatabase{net, gateway:gateway.ip_addr});
             }
         }
     }
-    
+
     if changed {
         Changed::ValueChanged(result.to_vec())
     } else {
@@ -39,14 +39,14 @@ pub fn if_down(net: IpNet, _interfaces: Vec<Interface>, db: &Vec<IfDatabase>) ->
     // if the interface is on our watchlist remove it
     let mut changed = false;
     let mut result = db.clone();
-    
+
     for item in db.iter() {
         if item.net == net {
             changed = true
         }
     }
     result.retain(|item| item.net != net);
-    
+
     if changed {
         Changed::ValueChanged(result.to_vec())
     } else {
@@ -60,7 +60,7 @@ pub fn wireguard_interfaces() -> Vec<Interface> {
 
     if let Ok(wg_interfaces) = enumerate_wireguard() {
         for interface in wg_interfaces {
-            
+
             for netif in interfaces.iter() {
                 if (netif.ipv4.len() == 0) && (netif.ipv6.len() == 0) {
                     continue;
@@ -71,7 +71,7 @@ pub fn wireguard_interfaces() -> Vec<Interface> {
             }
         }
     }
-    
+
     result
 }
 
@@ -123,7 +123,7 @@ mod tests {
     #[test]
     fn add_remove_interface() {
         let mut db: Vec<IfDatabase> = vec![];
-        db = match if_up("192.168.1.10/24".parse().unwrap(), interfaces(), &mut db) { 
+        db = match if_up("192.168.1.10/24".parse().unwrap(), interfaces(), &mut db) {
             Changed::ValueChanged(db) => db,
             Changed::ValueUnchanged(db) => {
                 assert!(false);
@@ -131,7 +131,7 @@ mod tests {
             }
         };
         assert_eq!(db.len(), 1);
-        db = match if_down("192.168.1.10/24".parse().unwrap(), interfaces(), &mut db) { 
+        db = match if_down("192.168.1.10/24".parse().unwrap(), interfaces(), &mut db) {
             Changed::ValueChanged(db) => db,
             Changed::ValueUnchanged(db) => {
                 assert!(false);
@@ -144,14 +144,14 @@ mod tests {
     #[test]
     fn mixed_add_interface() {
         let mut db: Vec<IfDatabase> = vec![];
-        db = match if_up("192.168.1.10/24".parse().unwrap(), interfaces(), &mut db) { 
+        db = match if_up("192.168.1.10/24".parse().unwrap(), interfaces(), &mut db) {
             Changed::ValueChanged(db) => db,
             Changed::ValueUnchanged(db) => {
                 assert!(false);
                 db
             }
         };
-        db = match if_up("10.0.0.10/8".parse().unwrap(), interfaces(), &mut db) { 
+        db = match if_up("10.0.0.10/8".parse().unwrap(), interfaces(), &mut db) {
             Changed::ValueChanged(db) => {
                 assert!(false);
                 db
@@ -165,21 +165,21 @@ mod tests {
     fn no_remove_interface() {
         let mut db: Vec<IfDatabase> = vec![];
 
-        db = match if_up("192.168.1.10/24".parse().unwrap(), interfaces(), &mut db) { 
+        db = match if_up("192.168.1.10/24".parse().unwrap(), interfaces(), &mut db) {
             Changed::ValueChanged(db) => db,
             Changed::ValueUnchanged(db) => {
                 assert!(false);
                 db
             }
         };
-        db = match if_up("10.0.0.10/8".parse().unwrap(), interfaces(), &mut db) { 
+        db = match if_up("10.0.0.10/8".parse().unwrap(), interfaces(), &mut db) {
             Changed::ValueChanged(db) => {
                 assert!(false);
                 db
             }
             Changed::ValueUnchanged(db) => db
         };
-        db = match if_down("10.0.0.10/8".parse().unwrap(), interfaces(), &mut db) { 
+        db = match if_down("10.0.0.10/8".parse().unwrap(), interfaces(), &mut db) {
             Changed::ValueChanged(db) => {
                 assert!(false);
                 db

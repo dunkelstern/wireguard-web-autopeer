@@ -10,6 +10,7 @@ default-net = "0.14.1"
 env_logger = "0.10.0"
 futures = "0.3.28"
 if-watch = { version = "3.0.1", features = ["smol"] }
+log = "0.4.17"
 reqwest = { version = "0.11.16", features = ["blocking", "json"] }
 serde = { version = "1.0.160", features = ["derive"] }
 serde_json = "1.0.96"
