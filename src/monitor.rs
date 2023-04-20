@@ -17,8 +17,8 @@ pub fn monitor(update: NetworkChangeCallback) {
         let mut set = IfWatcher::new().unwrap();
         loop {
             let event = set.select_next_some().await;
-            let interfaces = default_net::get_interfaces();
             if let Ok(ev) = event {
+                let interfaces = default_net::get_interfaces();
                 state = match ev {
                     IfEvent::Up(ip) => {
                         match if_up(ip, interfaces, &state.if_database) {
