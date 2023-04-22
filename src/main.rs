@@ -59,51 +59,57 @@ pub fn update(mut state: State) -> State {
 fn main() {
     env_logger::init();
 
-    // FIXME: Remove all peers on shutdown
-    thread::spawn(move || {
-        monitor(update);
-    });
-
     #[cfg(target_os = "linux")]
-    gtk::init().unwrap();
+    if let Ok(_gtk) = gtk::init() {
 
-    let mut tray = TrayItem::new("Wireguard-Web-Autopeer", "wireguard-web-autopeer").unwrap();
+        // FIXME: Remove all peers on shutdown
+        thread::spawn(move || {
+            monitor(update);
+        });
 
-    tray.add_label("Wireguard-Web").unwrap();
+        let mut tray = TrayItem::new("Wireguard-Web-Autopeer", "wireguard-web-autopeer").unwrap();
 
-    // FIXME: Add a refresh menu item
-    //
-    // tray.add_menu_item("Refresh Peers", || {
-    // }).unwrap();
+        tray.add_label("Wireguard-Web").unwrap();
+
+        // FIXME: Add a refresh menu item
+        //
+        // tray.add_menu_item("Refresh Peers", || {
+        // }).unwrap();
 
 
-    #[cfg(target_os = "linux")]
-    {
-        tray.add_menu_item("Quit", || {
-            gtk::main_quit();
-        }).unwrap();
-        gtk::main();
-    }
+        #[cfg(target_os = "linux")]
+        {
+            tray.add_menu_item("Quit", || {
+                gtk::main_quit();
+            }).unwrap();
+            gtk::main();
+        }
 
-    #[cfg(target_os = "macos")]
-    {
-        let mut inner = tray.inner_mut();
-        inner.add_quit_item("Quit");
-        inner.display();
-    }
+        // FIXME: this is wrong
+        #[cfg(target_os = "macos")]
+        {
+            let mut inner = tray.inner_mut();
+            inner.add_quit_item("Quit");
+            inner.display();
+        }
 
-    #[cfg(target_os = "windows")]
-    {
-        let (tx, rx) = mpsc::channel();
-        tray.add_menu_item("Quit", move || {
-            tx.send(Message::Quit).unwrap();
-        }).unwrap();
+        // FIXME: this is wrong
+        #[cfg(target_os = "windows")]
+        {
+            let (tx, rx) = mpsc::channel();
+            tray.add_menu_item("Quit", move || {
+                tx.send(Message::Quit).unwrap();
+            }).unwrap();
 
-        loop {
-            match rx.recv() {
-                Ok(Message::Quit) => break,
-                _ => {}
+            loop {
+                match rx.recv() {
+                    Ok(Message::Quit) => break,
+                    _ => {}
+                }
             }
         }
+    } else {
+        // No systray, probably running headless or as root
+        monitor(update);
     }
 }

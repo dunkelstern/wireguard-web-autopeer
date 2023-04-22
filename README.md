@@ -28,3 +28,22 @@ the service sits physically on the same network as the service.
    from a previous iteration remove peers not in the response anymore from the wireguard interface
 8. Remember which peers have been added
 9. Periodically check if peers have changed networks by restarting the process on 4
+
+## TODO
+
+- Switch to `wireguard-uapi` as the current implementation fails to compile on osx and windows
+- Auto-detect if we're running as root and skip systray integration
+- Auto-detect if we're missing `CAP_NET_ADMIN=+eip` capability
+- Remove peers we added on shutdown
+
+## Running
+
+1. To run the client it needs to have admin capabilities. Set with:
+   ```bash
+   sudo setcap CAP_NET_ADMIN=+eip target/release/wireguard-web-autopeer
+   ```
+2. If running as systemd you can add the caps there or run as admin.
+3. If you want the icon displayed on Linux run:
+   ```bash
+   cp resources/wireguard-web-autopeer.svg $HOME/.local/share/icons
+   ```
