@@ -38,6 +38,7 @@ the service sits physically on the same network as the service.
 - Shorter timeouts for communication
 - Do not try to contact someone if there is no default gateway anymore, just remove peers
 - on ifup wait for ip to arrive
+- re-poll in intervals for changes 
 
 ## Running
 
