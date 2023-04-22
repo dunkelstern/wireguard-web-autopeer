@@ -35,6 +35,9 @@ the service sits physically on the same network as the service.
 - Auto-detect if we're running as root and skip systray integration
 - Auto-detect if we're missing `CAP_NET_ADMIN=+eip` capability
 - Remove peers we added on shutdown
+- Shorter timeouts for communication
+- Do not try to contact someone if there is no default gateway anymore, just remove peers
+- on ifup wait for ip to arrive
 
 ## Running
 
