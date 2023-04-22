@@ -60,11 +60,10 @@ pub fn remove_peer(peer: &Peer, interface: &String) {
 }
 
 pub fn pubkey_by_interface(interface_name: InterfaceName) -> Option<String> {
-    debug!("fetching pubkey for {:?}", interface_name);
-    
     #[cfg(target_os = "linux")]
     if let Ok(device) = Device::get(&interface_name, Backend::Kernel) {
         if let Some(key) = device.public_key {
+            debug!("fetching pubkey for {:?}: {:?}", interface_name, key);            
             return Some(key.to_base64())
         }
     }

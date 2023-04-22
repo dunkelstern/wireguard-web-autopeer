@@ -63,6 +63,7 @@ pub fn wireguard_interfaces() -> Vec<WGInterface> {
 
             for netif in interfaces.iter() {
                 if (netif.ipv4.len() == 0) && (netif.ipv6.len() == 0) {
+                    debug!("No IP on {:?}, skipping", netif.name);
                     continue;
                 }
                 if netif.name == interface.to_string() {
