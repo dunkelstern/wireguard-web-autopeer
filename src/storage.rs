@@ -3,11 +3,13 @@ use default_net::Interface;
 use if_watch::IpNet;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Peer {
     pub pubkey: String,
     pub endpoint: Option<IpAddr>,
     pub port: Option<u16>,
+    
+    #[serde(rename = "ip")]
     pub ips: Option<Vec<IpAddr>>,
     
     #[serde(default = "empty_interface")]

@@ -10,15 +10,16 @@ use crate::{
     ip_net::FirstIp,
 };
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct PeeringRequest {
     ip: IpAddr,
+    #[serde(rename = "netmask")]
     prefix_len: u8,
     gateway: IpAddr,
     pubkey: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct PeeringResponse {
     pub peers: Vec<Peer>,
 }
@@ -54,14 +55,17 @@ pub fn peering_request(interface: &WGInterface, db: &Vec<IfDatabase>) -> Peering
 
         for ip in ips {
             let client = reqwest::blocking::Client::new();
-            let url = format!("http://{}", ip);
-            // FIXME: URL wrong when using IPv6
+            let url = match ip {
+                IpAddr::V4(_ip) => format!("http://{}/peering-request", ip),
+                IpAddr::V6(_ip) => format!("http://[{}]/peering-request", ip)
+            };
             //let url = format!("http://localhost:8000?{}", ip);
             let res = client.post(url)
                 .json(&json_data)
                 .send();
 
             if let Ok(response) = res {
+                debug!("Response: {:?}", response);
                 match response.json::<PeeringResponse>() {
                     Ok(peering_response) => {
                         for mut peer in peering_response.peers {
@@ -80,4 +84,31 @@ pub fn peering_request(interface: &WGInterface, db: &Vec<IfDatabase>) -> Peering
     }
 
     PeeringResponse { peers }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::PeeringResponse;
+
+
+    #[test]
+    fn deserialize_full_peer_list() {
+        let mut result: PeeringResponse = serde_json::from_str(r#"{"peers": [{"pubkey": "123", "endpoint": "10.0.0.0", "port": 123, "ip": [ "10.0.0.0", "fd00::1"]}]}"#).unwrap();
+        assert_eq!(result.peers.len(), 1);
+        let peer = result.peers.pop().unwrap();
+        assert_eq!(peer.pubkey, "123");
+        assert_eq!(peer.endpoint, Some("10.0.0.0".parse().unwrap()));
+        assert_eq!(peer.port, Some(123));
+        let ips = peer.ips.unwrap();
+        assert_eq!(ips.len(), 2);
+    }
+
+    #[test]
+    fn deserialize_pubkey_peer_list() {
+        let mut result: PeeringResponse = serde_json::from_str(r#"{"peers": [{"pubkey": "123"}]}"#).unwrap();
+        assert_eq!(result.peers.len(), 1);
+        let peer = result.peers.pop().unwrap();
+        assert_eq!(peer.pubkey, "123");
+    }
 }
