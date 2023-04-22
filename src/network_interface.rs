@@ -7,7 +7,7 @@ use wireguard_control::backends::kernel::enumerate as enumerate_wireguard;
 #[cfg(not(target_os = "linux"))]
 use wireguard_control::backends::userspace::enumerate as enumerate_wireguard;
 
-use crate::storage::{IfDatabase, Changed};
+use crate::{storage::{IfDatabase, Changed, WGInterface}, wireguard::pubkey_by_interface};
 
 
 pub fn if_up(net: IpNet, interfaces: Vec<Interface>, db: &Vec<IfDatabase>) -> Changed<Vec<IfDatabase>> {
@@ -54,8 +54,8 @@ pub fn if_down(net: IpNet, _interfaces: Vec<Interface>, db: &Vec<IfDatabase>) ->
     }
 }
 
-pub fn wireguard_interfaces() -> Vec<Interface> {
-    let mut result: Vec<Interface> = vec![];
+pub fn wireguard_interfaces() -> Vec<WGInterface> {
+    let mut result: Vec<WGInterface> = vec![];
     let interfaces = default_net::get_interfaces();
 
     if let Ok(wg_interfaces) = enumerate_wireguard() {
@@ -66,7 +66,14 @@ pub fn wireguard_interfaces() -> Vec<Interface> {
                     continue;
                 }
                 if netif.name == interface.to_string() {
-                    result.push(netif.clone());
+                    if let Some(pubkey) = pubkey_by_interface(interface) {
+                        result.push(
+                            WGInterface{
+                                interface: netif.clone(),
+                                pubkey
+                            }
+                        );
+                    }
                 }
             }
         }

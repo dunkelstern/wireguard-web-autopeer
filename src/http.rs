@@ -1,13 +1,12 @@
 use std::net::IpAddr;
 
-use default_net::Interface;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
 use reqwest;
 
 use crate::{
-    storage::{IfDatabase, Peer},
+    storage::{IfDatabase, Peer, WGInterface},
     ip_net::FirstIp,
 };
 
@@ -16,6 +15,7 @@ struct PeeringRequest {
     ip: IpAddr,
     prefix_len: u8,
     gateway: IpAddr,
+    pubkey: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -24,22 +24,23 @@ pub struct PeeringResponse {
 }
 
 
-pub fn peering_request(interface: &Interface, db: &Vec<IfDatabase>) -> PeeringResponse {
+pub fn peering_request(interface: &WGInterface, db: &Vec<IfDatabase>) -> PeeringResponse {
     let mut json_data: Vec<PeeringRequest> = vec![];
 
     for item in db {
         json_data.push(PeeringRequest{
             ip: item.net.addr(),
             prefix_len: item.net.prefix_len(),
-            gateway: item.gateway
+            gateway: item.gateway,
+            pubkey: interface.pubkey.clone()
         });
     }
 
     let mut ips: Vec<IpAddr> = vec![];
-    for v4 in interface.ipv4.iter() {
+    for v4 in interface.interface.ipv4.iter() {
         ips.push(v4.first_ip());
     }
-    for v6 in interface.ipv6.iter() {
+    for v6 in interface.interface.ipv6.iter() {
         ips.push(v6.first_ip());
     }
 
@@ -53,7 +54,8 @@ pub fn peering_request(interface: &Interface, db: &Vec<IfDatabase>) -> PeeringRe
 
         for ip in ips {
             let client = reqwest::blocking::Client::new();
-            let url = format!("https://{}", ip);
+            let url = format!("http://{}", ip);
+            // FIXME: URL wrong when using IPv6
             //let url = format!("http://localhost:8000?{}", ip);
             let res = client.post(url)
                 .json(&json_data)
@@ -63,7 +65,7 @@ pub fn peering_request(interface: &Interface, db: &Vec<IfDatabase>) -> PeeringRe
                 match response.json::<PeeringResponse>() {
                     Ok(peering_response) => {
                         for mut peer in peering_response.peers {
-                            peer.interface = interface.name.clone();
+                            peer.interface = interface.interface.name.clone();
                             peers.push(peer);
                         }
                     }

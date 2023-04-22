@@ -37,19 +37,19 @@ pub fn update(mut state: State) -> State {
 
         // remove peers
         for peer in &state.peers {
-            if interface.name == peer.interface {
-                remove_peer(peer, &interface.name);
+            if interface.interface.name == peer.interface {
+                remove_peer(peer, &interface.interface.name);
             }
         }
 
         // add new peers and dedup internal state
         state.peers.extend(response.peers.clone());
         state.peers.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
-        state.peers.dedup_by(|a, b| a.pubkey == b.pubkey && a.ip == b.ip && a.interface == b.interface);
-
+        state.peers.dedup_by(|a, b| a.pubkey == b.pubkey && a.ips == b.ips && a.interface == b.interface);
+        
         // add peers to wireguard
         for peer in &response.peers {
-            add_peer(peer, &interface.name);
+            add_peer(peer, &interface.interface.name);
         }
     }
 

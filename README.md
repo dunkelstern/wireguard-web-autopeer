@@ -16,6 +16,7 @@ the service sits physically on the same network as the service.
 2. Get network interfaces with default-net, save wireguard interfaces
 3. Set up network change notifications with if-watch, on network change run from 4
 4. Try to contact the default gateway on each wireguard interface with following info (JSON)
+   - Pubkey
    - Standard gw-interface
    - IP+Mask on standard gw-interface
 5. Server now checks if some of the other clients have
