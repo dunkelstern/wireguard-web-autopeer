@@ -1,7 +1,7 @@
 use default_net;
 
 use futures::StreamExt;
-use if_watch::{smol::IfWatcher, IfEvent};
+use if_watch::{tokio::IfWatcher, IfEvent};
 
 use crate::storage::{Changed, State};
 use crate::network_interface::{if_up, if_down};
@@ -9,11 +9,11 @@ use crate::network_interface::{if_up, if_down};
 pub type NetworkChangeCallback = fn(state: State) -> State;
 
 
-pub fn monitor(update: NetworkChangeCallback) {
+pub async fn monitor(update: NetworkChangeCallback) {
     let mut state = State::new();
 
     // watch interfaces go up or down
-    smol::block_on(async {
+    tokio::spawn(async {
         let mut set = IfWatcher::new().unwrap();
         loop {
             let event = set.select_next_some().await;

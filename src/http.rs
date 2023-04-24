@@ -25,7 +25,7 @@ pub struct PeeringResponse {
 }
 
 
-pub fn peering_request(interface: &WGInterface, db: &Vec<IfDatabase>) -> PeeringResponse {
+pub async fn peering_request(interface: &WGInterface, db: &Vec<IfDatabase>) -> PeeringResponse {
     let mut json_data: Vec<PeeringRequest> = vec![];
 
     for item in db {
@@ -54,7 +54,7 @@ pub fn peering_request(interface: &WGInterface, db: &Vec<IfDatabase>) -> Peering
         debug!("Sending to {:?} JSON: {}", ips, data);
 
         for ip in ips {
-            let client = reqwest::blocking::Client::new();
+            let client = reqwest::Client::new();
             let url = match ip {
                 IpAddr::V4(_ip) => format!("http://{}/peering-request", ip),
                 IpAddr::V6(_ip) => format!("http://[{}]/peering-request", ip)
@@ -62,11 +62,11 @@ pub fn peering_request(interface: &WGInterface, db: &Vec<IfDatabase>) -> Peering
             //let url = format!("http://localhost:8000?{}", ip);
             let res = client.post(url)
                 .json(&json_data)
-                .send();
+                .send().await;
 
             if let Ok(response) = res {
                 debug!("Response: {:?}", response);
-                match response.json::<PeeringResponse>() {
+                match response.json::<PeeringResponse>().await {
                     Ok(peering_response) => {
                         for mut peer in peering_response.peers {
                             peer.interface = interface.interface.name.clone();
