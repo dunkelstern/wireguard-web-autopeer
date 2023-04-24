@@ -1,6 +1,22 @@
 use std::net::{IpAddr, SocketAddr};
+use if_watch::IpNet;
 use serde::{Deserialize, Serialize};
 
+/// Timeout in seconds.
+#[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq)]
+pub struct Timeout(u64);
+impl Default for Timeout {
+    fn default() -> Self {
+        Timeout(30)
+    }
+}
+impl From<Timeout> for u64 {
+    fn from(value: Timeout) -> Self {
+        value.0
+    }
+}
+
+/// Peer information
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Peer {
     pub pubkey: String,
@@ -9,19 +25,35 @@ pub struct Peer {
     pub ip: Option<Vec<IpAddr>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+/// Network interface definition
+#[derive(Clone, Debug, PartialEq)]
 pub struct NetworkInterface {
     pub name: String,
-    pub ip: Option<IpAddr>,
+    pub net: Option<IpNet>,
     pub nexthop: Option<IpAddr>,
-    pub prefix_len: u8,
     pub is_default: bool,
     pub peers: Vec<Peer>,
 }
 
+/// Settings
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Settings {
+    #[serde(default)]
+    pub refresh_timeout: Timeout,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self { refresh_timeout: Timeout::default() }
+    }
+}
+
+
+/// Internal state
 #[derive(Clone, Debug)]
 pub struct StateManager {
     pub interfaces: Vec<NetworkInterface>,
+    pub settings: Settings,
 }
 
 impl TryFrom<Peer> for SocketAddr {
@@ -33,21 +65,5 @@ impl TryFrom<Peer> for SocketAddr {
         } else {
             Err(())
         }
-    }
-}
-
-impl StateManager {
-    pub fn new() -> Self {
-        Self{interfaces: vec![]}
-    }
-    
-    pub fn ifup(&self, interface: &String) {
-        info!("Interface up event: {:?}", interface);
-
-    }
-    
-    pub fn ifdown(&self, interface: &String) {
-        info!("Interface down event: {:?}", interface);
-
     }
 }

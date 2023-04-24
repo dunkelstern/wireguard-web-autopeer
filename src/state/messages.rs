@@ -1,8 +1,9 @@
+use if_watch::IpNet;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Message{
-    InterfaceUp(String),
-    InterfaceDown(String),
+    InterfaceUp(IpNet),
+    InterfaceDown(IpNet),
     RefreshPeers,
     Suspend,
     Resume,

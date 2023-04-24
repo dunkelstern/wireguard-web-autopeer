@@ -38,10 +38,10 @@ pub async fn peering_request(interface: &WGInterface, db: &Vec<IfDatabase>) -> P
     }
 
     let mut ips: Vec<IpAddr> = vec![];
-    for v4 in interface.interface.ipv4.iter() {
+    for v4 in &interface.interface.ipv4 {
         ips.push(v4.first_ip());
     }
-    for v6 in interface.interface.ipv6.iter() {
+    for v6 in &interface.interface.ipv6 {
         ips.push(v6.first_ip());
     }
 

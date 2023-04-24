@@ -91,7 +91,7 @@ pub fn wireguard_interfaces() -> Vec<WGInterface> {
     if let Ok(wg_interfaces) = enumerate_wireguard() {
         for interface in wg_interfaces {
 
-            for netif in interfaces.iter() {
+            for netif in &interfaces {
                 if (netif.ipv4.len() == 0) && (netif.ipv6.len() == 0) {
                     debug!("No IP on {:?}, skipping", netif.name);
                     continue;

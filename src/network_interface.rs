@@ -34,7 +34,7 @@ pub fn if_down(net: IpNet, _interfaces: Vec<Interface>, db: &Vec<IfDatabase>) ->
     let mut changed = false;
     let mut result = db.clone();
 
-    for item in db.iter() {
+    for item in &db {
         if item.net == net {
             changed = true
         }

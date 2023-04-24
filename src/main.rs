@@ -1,10 +1,15 @@
 #[macro_use]
 extern crate log;
 
-use state::messages::Message;
-use tokio::{sync::mpsc::{channel, Sender}, task::JoinHandle};
+// Crate modules
+mod state;
+mod tray;
+mod autorefresh;
+mod network;
 
-use tokio::signal::ctrl_c;
+// Everything tokio
+use tokio::{select, sync::mpsc::channel, signal::ctrl_c};
+use tokio_util::sync::CancellationToken;
 
 #[cfg(unix)]
 use tokio::signal::unix::{signal, SignalKind};
@@ -12,67 +17,28 @@ use tokio::signal::unix::{signal, SignalKind};
 #[cfg(windows)]
 use tokio::signal::windows::{ctrl_break, ctrl_close};
 
-use tokio_util::sync::CancellationToken;
-use tokio::select;
+// Systray
 use tray::Tray;
 
-use crate::state::structs::StateManager;
+// State keeping
+use state::messages::Message;
+use state::structs::StateManager;
 
-mod state;
-mod tray;
+// Services
+use autorefresh::autorefresh;
+use network::monitor::monitor;
 
 
-// pub async fn update(mut state: State) -> State {
-//     let wg_interfaces = wireguard_interfaces();
-
-//     for interface in wg_interfaces {
-//         let response = peering_request(&interface, &state.if_database).await;
-
-//         // remove peers
-//         for peer in &state.peers {
-//             if interface.interface.name == peer.interface {
-//                 remove_peer(peer, &interface.interface.name);
-//             }
-//         }
-
-//         // add new peers and dedup internal state
-//         state.peers.extend(response.peers.clone());
-//         state.peers.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
-//         state.peers.dedup_by(|a, b| a.pubkey == b.pubkey && a.ips == b.ips && a.interface == b.interface);
-        
-//         // add peers to wireguard
-//         for peer in &response.peers {
-//             add_peer(peer, &interface.interface.name);
-//         }
-//     }
-
-//     state
-// }
-
-fn autorefresh(tx: Sender<Message>, cancel: CancellationToken) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        loop {
-            select! {
-                // cancelled, break loop, exit task
-                _ = cancel.cancelled() => {
-                    break;
-                }
-                // 60 seconds timeout, send refresh message
-                _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
-                    let _ = tx.send(Message::RefreshPeers).await.unwrap();
-                }
-            }
-        }
-    })
-}
-
+// Main loop
 #[tokio::main]
 async fn main() {
+    // logging
     env_logger::init();
-
+    
     // local state
-    let state = StateManager::new();
+    let mut state = StateManager::new();
     let (eventbus_tx, mut eventbus_rx) = channel::<Message>(32);
+    info!("Running with settings: {}", serde_json::to_string(&state.settings).unwrap());
 
     // Systray
     let (tray, tray_tx) = Tray::try_new(eventbus_tx.clone());
@@ -88,6 +54,7 @@ async fn main() {
     #[cfg(unix)]
     let mut term = signal(SignalKind::terminate()).unwrap();
 
+    // On windows we use CTRL+Break for reload and Console close for term
     #[cfg(windows)]
     let mut hup = ctrl_break().unwrap();
     #[cfg(windows)]
@@ -97,7 +64,8 @@ async fn main() {
     let mut background_tasks = CancellationToken::new();
 
     // start auto refresh loop
-    let mut refresh_handle = Some(autorefresh(eventbus_tx.clone(), background_tasks.clone()));    
+    let mut refresh_handle = Some(autorefresh(eventbus_tx.clone(), background_tasks.clone(), state.settings.refresh_timeout));    
+    let mut monitor_handle = Some(monitor(eventbus_tx.clone(), background_tasks.clone()));
 
     debug!("Entering main event loop...");
     'main: loop {
@@ -107,14 +75,6 @@ async fn main() {
                 debug!("Received Message: {:?}", message);
                 match message.unwrap() {
                     Message::Quit => {
-                        if let Some(tx) = &tray_tx {
-                            tx.send(Message::Quit).await.expect("Failed to send quit messaage to systray");
-                        }
-                        // Suspend Network monitor and Automatic refresh
-                        background_tasks.cancel();
-                        if let Some(handle) = refresh_handle {
-                            let _ = &handle.await.unwrap();
-                        }
                         break 'main;
                     }
                     Message::Suspend => {
@@ -127,6 +87,10 @@ async fn main() {
                             let _ = &handle.await.unwrap();
                             refresh_handle = None;
                         }
+                        if let Some(handle) = monitor_handle {
+                            let _ = &handle.await.unwrap();
+                            monitor_handle = None;
+                        }
                     }
                     Message::Resume => {
                         if let Some(tx) = &tray_tx {
@@ -137,50 +101,43 @@ async fn main() {
                         // network_monitor(eventbus_tx.clone(), backgroundTasks.clone());
                         refresh_handle = match refresh_handle {
                             Some(handle) => Some(handle),
-                            None => Some(autorefresh(eventbus_tx.clone(), background_tasks.clone()))
-                        }
+                            None => Some(autorefresh(eventbus_tx.clone(), background_tasks.clone(), state.settings.refresh_timeout))
+                        };
+                        monitor_handle = match monitor_handle {
+                            Some(handle) => Some(handle),
+                            None => Some(monitor(eventbus_tx.clone(), background_tasks.clone()))
+                        };
                     }
-                    Message::InterfaceUp(interface) => state.ifup(&interface),
-                    Message::InterfaceDown(interface) => state.ifdown(&interface),
-                    Message::RefreshPeers => {
-                        // Iterate over all interfaces and call ifup on StateManager
-                        for interface in &state.interfaces {
-                            state.ifup(&interface.name);
-                        }
-                    }
+                    Message::InterfaceUp(interface) => state.ifup(interface).await,
+                    Message::InterfaceDown(interface) => state.ifdown(interface).await,
+                    Message::RefreshPeers => state.refresh().await,
                 }
             }
             _ = hup.recv() => {
                 info!("Received HUP, Reloading all peers...");
-                // Iterate over all interfaces and call ifup on StateManager
-                for interface in &state.interfaces {
-                    state.ifup(&interface.name);
-                }                
+                state.refresh().await;
             }
             _ = term.recv() => {
                 info!("Received TERM, Shutting down...");
-                if let Some(tx) = &tray_tx {
-                    tx.send(Message::Quit).await.expect("Failed to send quit messaage to systray");
-                }
-                // Suspend Network monitor and Automatic refresh
-                background_tasks.cancel();
-                if let Some(handle) = refresh_handle {
-                    let _ = &handle.await.unwrap();
-                }
                 break 'main;
             }
             _ = ctrl_c() => {
                 info!("Received CTRL+C, Shutting down...");
-                if let Some(tx) = &tray_tx {
-                    tx.send(Message::Quit).await.expect("Failed to send quit messaage to systray");
-                }
-                // Suspend Network monitor and Automatic refresh
-                background_tasks.cancel();
-                if let Some(handle) = refresh_handle {
-                    let _ = &handle.await.unwrap();
-                }
                 break 'main;
             }
         }
     }
+    
+    // Shutdown all services
+    if let Some(tx) = &tray_tx {
+        tx.send(Message::Quit).await.expect("Failed to send quit messaage to systray");
+    }
+    background_tasks.cancel();
+    if let Some(handle) = refresh_handle {
+        let _ = &handle.await.unwrap();
+    }
+    if let Some(handle) = monitor_handle {
+        let _ = &handle.await.unwrap();
+    }
+
 }
