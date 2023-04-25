@@ -11,7 +11,6 @@ pub trait GetInterface {
 
 impl GetInterface for IpNet {
     fn interface_name(&self) -> Option<String> {
-        debug!("Searching interface name for {:?}", self);
         if let Some(interface) = self.interface(){
             return Some(interface.name);
         }
@@ -19,7 +18,6 @@ impl GetInterface for IpNet {
     }
 
     fn interface(&self) -> Option<NetworkInterface> {
-        debug!("Searching interface for {:?}", self);
         let interfaces = NetworkInterface::show().unwrap();
         for interface in &interfaces {
             for addr in &interface.addr {

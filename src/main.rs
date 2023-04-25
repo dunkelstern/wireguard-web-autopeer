@@ -75,7 +75,6 @@ async fn main() {
         select! {
             // receive a message
             message = eventbus_rx.recv() => {
-                debug!("Received Message: {:?}", message);
                 match message.unwrap() {
                     Message::Quit => {
                         break 'main;
