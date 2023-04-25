@@ -7,6 +7,11 @@ use crate::state::{messages::Message};
 
 
 pub fn monitor(tx: Sender<Message>, cancel: CancellationToken) -> JoinHandle<()> {
+    let tx_clone = tx.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        let _ = tx_clone.send(Message::InterfacesLoaded).await.unwrap();
+    });
     tokio::spawn(async move {
         let mut watcher = IfWatcher::new().unwrap();
         loop {

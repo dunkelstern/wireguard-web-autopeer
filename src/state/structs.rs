@@ -25,6 +25,12 @@ pub struct Peer {
     pub ip: Option<Vec<IpAddr>>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Wireguard {
+    pub pubkey: Option<String>,
+    pub port: u16,
+}
+
 /// Network interface definition
 #[derive(Clone, Debug, PartialEq)]
 pub struct NetworkInterface {
@@ -33,6 +39,29 @@ pub struct NetworkInterface {
     pub nexthop: Option<IpAddr>,
     pub is_default: bool,
     pub peers: Vec<Peer>,
+    pub wireguard: Option<Wireguard>,
+}
+
+impl NetworkInterface {
+    pub fn is_wireguard(&self) -> bool {
+        if let Some(_) = &self.wireguard {
+            true
+        } else {
+            false
+        }
+    }
+    
+    pub fn has_pubkey(&self) -> bool {
+        if let Some(wg) = &self.wireguard {
+            if let Some(_) = &wg.pubkey {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }        
+    }
 }
 
 /// Settings
@@ -54,6 +83,7 @@ impl Default for Settings {
 pub struct StateManager {
     pub interfaces: Vec<NetworkInterface>,
     pub settings: Settings,
+    pub suspended: bool,
 }
 
 impl TryFrom<Peer> for SocketAddr {

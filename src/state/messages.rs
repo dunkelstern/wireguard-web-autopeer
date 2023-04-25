@@ -7,5 +7,6 @@ pub enum Message{
     RefreshPeers,
     Suspend,
     Resume,
-    Quit
+    Quit,
+    InterfacesLoaded,
 }

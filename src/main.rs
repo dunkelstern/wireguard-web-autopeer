@@ -1,4 +1,5 @@
 #[macro_use]
+
 extern crate log;
 
 // Crate modules
@@ -6,6 +7,8 @@ mod state;
 mod tray;
 mod autorefresh;
 mod network;
+mod wireguard;
+mod http;
 
 // Everything tokio
 use tokio::{select, sync::mpsc::channel, signal::ctrl_c};
@@ -34,7 +37,7 @@ use network::monitor::monitor;
 async fn main() {
     // logging
     env_logger::init();
-    
+        
     // local state
     let mut state = StateManager::new();
     let (eventbus_tx, mut eventbus_rx) = channel::<Message>(32);
@@ -91,6 +94,7 @@ async fn main() {
                             let _ = &handle.await.unwrap();
                             monitor_handle = None;
                         }
+                        state.suspended = true;
                     }
                     Message::Resume => {
                         if let Some(tx) = &tray_tx {
@@ -107,6 +111,10 @@ async fn main() {
                             Some(handle) => Some(handle),
                             None => Some(monitor(eventbus_tx.clone(), background_tasks.clone()))
                         };
+                    }
+                    Message::InterfacesLoaded => {
+                        state.suspended = false;
+                        state.refresh().await;
                     }
                     Message::InterfaceUp(interface) => state.ifup(interface).await,
                     Message::InterfaceDown(interface) => state.ifdown(interface).await,

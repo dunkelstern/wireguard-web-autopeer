@@ -1,7 +1,7 @@
 use if_watch::IpNet;
 use network_interface::{NetworkInterface, NetworkInterfaceConfig};
 use std::net::{Ipv4Addr, Ipv6Addr, IpAddr};
-use net_route::{Handle, Route};
+use net_route::Handle;
 
 
 pub trait GetInterface {
@@ -66,7 +66,7 @@ impl FirstIp for IpNet {
     }    
 }
 
-pub async fn next_hop(net: IpNet) -> Option<(bool,Route)> {
+pub async fn next_hop(net: IpNet) -> (bool, Option<IpAddr>) {
     match Handle::new() {
         Ok(handle) => {
             if let Ok(routes) = handle.list().await {
@@ -74,7 +74,7 @@ pub async fn next_hop(net: IpNet) -> Option<(bool,Route)> {
                 for route in &routes {
                     if (net.prefix_len() == route.prefix) && (net.contains(&route.destination)) {
                         if let Some(_) = route.gateway {
-                            return Some((false, route.clone()));
+                            return (false, route.gateway.clone());
                         }
                     }
                 }
@@ -86,10 +86,10 @@ pub async fn next_hop(net: IpNet) -> Option<(bool,Route)> {
                         }
                         if let Some(gateway) = route.gateway {
                             if let (IpNet::V4(_), IpAddr::V4(_)) = (net, gateway) {
-                                return Some((true, route.clone()));
+                                return (true, route.gateway.clone());
                             }
                             if let (IpNet::V6(_), IpAddr::V6(_)) = (net, gateway) {
-                                return Some((true, route.clone()));
+                                return (true, route.gateway.clone());
                             }
                         }
                     }                        
@@ -101,7 +101,7 @@ pub async fn next_hop(net: IpNet) -> Option<(bool,Route)> {
         }
     }
     
-    None
+    (false, None)
 }
 
 
