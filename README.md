@@ -31,14 +31,7 @@ the service sits physically on the same network as the service.
 
 ## TODO
 
-- Switch to `wireguard-uapi` as the current implementation fails to compile on osx and windows
-- Auto-detect if we're running as root and skip systray integration
-- Auto-detect if we're missing `CAP_NET_ADMIN=+eip` capability
-- Remove peers we added on shutdown
-- Shorter timeouts for communication
 - Do not try to contact someone if there is no default gateway anymore, just remove peers
-- on ifup wait for ip to arrive
-- re-poll in intervals for changes 
 
 ## Running
 
@@ -47,7 +40,3 @@ the service sits physically on the same network as the service.
    sudo setcap CAP_NET_ADMIN=+eip target/release/wireguard-web-autopeer
    ```
 2. If running as systemd you can add the caps there or run as admin.
-3. If you want the icon displayed on Linux run:
-   ```bash
-   cp resources/wireguard-web-autopeer.svg $HOME/.local/share/icons
-   ```
