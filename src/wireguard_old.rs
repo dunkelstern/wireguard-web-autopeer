@@ -1,5 +1,13 @@
 use std::{net::IpAddr, str::FromStr};
 use wireguard_control::{PeerConfigBuilder, Key, DeviceUpdate, Backend, InterfaceName, Device};
+use crate::storage::WGInterface;
+
+
+#[cfg(target_os = "linux")]
+use wireguard_control::backends::kernel::enumerate as enumerate_wireguard;
+
+#[cfg(not(target_os = "linux"))]
+use wireguard_control::backends::userspace::enumerate as enumerate_wireguard;
 
 use crate::storage::Peer;
 
@@ -57,21 +65,4 @@ pub fn remove_peer(peer: &Peer, interface: &String) {
             }
         }
     }
-}
-
-pub fn pubkey_by_interface(interface_name: InterfaceName) -> Option<String> {
-    #[cfg(target_os = "linux")]
-    if let Ok(device) = Device::get(&interface_name, Backend::Kernel) {
-        if let Some(key) = device.public_key {
-            debug!("fetching pubkey for {:?}: {:?}", interface_name, key);            
-            return Some(key.to_base64())
-        }
-    }
-    
-    #[cfg(not(target_os = "linux"))]
-    if let Ok(device) = Device::get(interface_name, Backend::Userspace) {
-        device.public_key
-    }
-    
-    None
 }
