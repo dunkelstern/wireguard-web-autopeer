@@ -1,0 +1,15 @@
+[Unit]
+Description=Wireguard VPN automatic peering agent
+After=network.target
+
+[Service]
+Type=exec
+WorkingDirectory=/tmp
+ExecStart=/usr/local/bin/wireguard-web-autopeer
+Restart=on-failure
+User=user
+Group=user
+AmbientCapabilities=CAP_NET_ADMIN
+
+[Install]
+WantedBy=multi-user.target
