@@ -58,7 +58,12 @@ pub async fn peering_request(state: &StateManager, wg: &NetworkInterface) -> Res
                 match response.text().await {
                     Ok(result) => {
                         match serde_json::from_str::<PeeringResponse>(&result) {
-                            Ok(data) => return Ok(data),
+                            Ok(mut data) => {
+                                for mut peer in &mut data.peers {
+                                    peer.wg_interface = Some(wg.name.clone());
+                                }
+                                return Ok(data);
+                            }
                             Err(error) => return Err(format!("{}: {}", error.to_string(), &result)),
                         }
                     }

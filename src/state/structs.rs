@@ -23,6 +23,7 @@ pub struct Peer {
     pub endpoint: Option<IpAddr>,
     pub port: Option<u16>,
     pub ip: Option<Vec<IpAddr>>,
+    pub wg_interface: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -43,14 +44,6 @@ pub struct NetworkInterface {
 }
 
 impl NetworkInterface {
-    pub fn is_wireguard(&self) -> bool {
-        if let Some(_) = &self.wireguard {
-            true
-        } else {
-            false
-        }
-    }
-    
     pub fn has_pubkey(&self) -> bool {
         if let Some(wg) = &self.wireguard {
             if let Some(_) = &wg.pubkey {

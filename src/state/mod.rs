@@ -1,6 +1,6 @@
 use if_watch::IpNet;
 
-use crate::{network::utils::{GetInterface, next_hop}, wireguard::information::query_wg_info, http::peering::peering_request};
+use crate::{network::utils::{GetInterface, next_hop}, wireguard::information::{query_wg_info, add_peer, remove_peer}, http::peering::peering_request};
 
 use self::structs::{StateManager, Settings, NetworkInterface, Peer};
 
@@ -21,11 +21,9 @@ impl StateManager {
         if !self.suspended {
             for interface in self.interfaces.clone() {
                 if interface.has_pubkey() {
+                    info!("Performing peering query on interface {} for {}...", interface.name, interface.net.unwrap());
                     match peering_request(&self, &interface).await {
-                        Ok(response) => {
-                            let dangling_peers = self.update_peers(response.peers, &interface);
-                            // TODO: Remove dangling peers from Wireguard interfaces
-                        },
+                        Ok(response) => self.update_peers(response.peers, &interface),
                         Err(error) => error!("ERROR: {}", error),
                     }
                 }
@@ -53,39 +51,64 @@ impl StateManager {
         true
     }
 
-    /// remove registered interface, removes peers of that interface if there were some
-    fn remove_interface(&mut self, net: IpNet) -> Vec<Peer> {        
-        let result = self.interfaces
-            .clone()
-            .into_iter()
-            .filter(|item| (item.net == Some(net)))
-            .flat_map(|item| item.peers)
-            .collect();
-        
-        self.interfaces.retain(|item| (item.net != Some(net)));
-        
-        result
-    }
-
     /// update peers of an interface, returns peers that have been removed
-    fn update_peers(&mut self, peers: Vec<Peer>, wg: &NetworkInterface) -> Vec<Peer> {
-        let old_peers: Vec<Peer> = vec![];
+    fn update_peers(&mut self, peers: Vec<Peer>, wg: &NetworkInterface) {
+        let mut old_peers: Vec<Peer> = vec![];
+
+        for interface in &self.interfaces {
+            old_peers.extend(interface.peers.clone());
+        }
 
         // find correct network interface for peers
-        for interface in &mut self.interfaces {
-            for peer in &peers {
+        for peer in &peers {
+            for interface in &mut self.interfaces {
                 if let (Some(net), Some(endpoint)) = (interface.net, peer.endpoint) {
                     // check if the network contains the endpoint and if the do not have the peer already
-                    if net.contains(&endpoint) && !interface.peers.contains(peer) {
-                        interface.peers.push(peer.clone());
-                        // TODO: add peers to wireguard interface
+                    if net.contains(&endpoint) {
+                        if !interface.peers.contains(peer) {
+                            interface.peers.push(peer.clone());
+                            // add peers to wireguard interface
+                            match add_peer(peer.clone()) {
+                                Ok(_) => info!("Added peer {:?} @ {} to interface {:?}", endpoint, wg.name, net),
+                                Err(error) => error!("Error adding peer {:?} @ {} to interface {:?}: {:?}", endpoint, wg.name, net, error),
+                            }
+                        }
+
+                        // only add peer to first interface
+                        break;
                     }
                 }
             }
         }
-        
-        // TODO: return old peers
-        old_peers
+
+        // clean out old peer list
+        old_peers.retain(|peer| {
+            if let Some(interface_name) = &peer.wg_interface {
+                if interface_name != &wg.name {
+                    return false;
+                }
+            }
+            return !peers.contains(peer);
+        });
+
+        for interface in &mut self.interfaces {
+            interface.peers.retain(|item| !old_peers.contains(item));
+        }
+
+        // Remove old peers from wireguard interfaces
+        for peer in old_peers {
+            if let Some(endpoint) = peer.endpoint {
+                match remove_peer(peer) {
+                    Ok(_) => info!("Removed peer {:?} @ {}", endpoint, wg.name),
+                    Err(error) => error!("Error removing peer {:?} @ {}: {:?}", endpoint, wg.name, error),
+                }
+            } else {
+                match remove_peer(peer.clone()) { // why the clone?
+                    Ok(_) => info!("Removed peer {:?} @ {}", &peer.pubkey, wg.name),
+                    Err(error) => error!("Error removing peer {:?} @ {}: {:?}", &peer.pubkey, wg.name, error),
+                }
+            }
+        }
     }
 
     pub async fn ifup(&mut self, net: IpNet) {
@@ -114,8 +137,22 @@ impl StateManager {
     
     pub async fn ifdown(&mut self, net: IpNet) {
         info!("Interface down event: {:?}", net);
-        let peers = self.remove_interface(net);
-        info!("Removing dangling peers: {:?}", peers);
+        let result: Vec<Peer> = self.interfaces
+            .clone()
+            .into_iter()
+            .filter(|item| (item.net == Some(net)))
+            .flat_map(|item| item.peers)
+            .collect();
+
+        self.interfaces.retain(|item| (item.net != Some(net)));
+        
+        // Remove peers from wireguard
+        for peer in result {
+            match remove_peer(peer.clone()) { // why the clone?
+                Ok(_) => info!("Removed peer {:?} @ {}", &peer.pubkey, &peer.wg_interface.unwrap()),
+                Err(error) => error!("Error removing peer {:?} @ {}: {:?}", &peer.pubkey, &peer.wg_interface.unwrap(), error),
+            }
+        }
     }
     
     pub async fn refresh(&mut self) {

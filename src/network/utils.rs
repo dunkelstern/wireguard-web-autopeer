@@ -64,6 +64,7 @@ impl FirstIp for IpNet {
     }    
 }
 
+// TODO: Make this a trait
 pub async fn next_hop(net: IpNet) -> (bool, Option<IpAddr>) {
     match Handle::new() {
         Ok(handle) => {
